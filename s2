@@ -1,0 +1,42 @@
+struct { const char *a, *f; } T[] = {
+    {"tbh","to be honest"},{"ig","I guess"},{"tbf","to be fair"},{"atm","at the moment"},
+    {"irl","in real life"},{"lol","laugh out loud"},{"asap","as soon as possible"},
+    {"omg","oh my god"},{"ttyl","talk to you later"},{"idk","I don't know"},
+    {"idc","I don't care"},{"nvm","never mind"}};
+int NT = sizeof T / sizeof T[0];
+
+void translate(const char *in, char *out) {
+    out[0] = 0;
+    while (*in) {
+        if (isalpha((unsigned char)*in)) {              // start of a word
+            char w[64], lw[64]; int k = 0;
+            while (isalpha((unsigned char)*in) && k < 63) {
+                w[k] = *in;                             // original case
+                lw[k] = tolower((unsigned char)*in);    // lowercase for matching
+                k++; in++;
+            }
+            w[k] = lw[k] = 0;
+            const char *r = NULL;
+            for (int i = 0; i < NT; i++)
+                if (!strcmp(lw, T[i].a)) { r = T[i].f; break; }
+            strcat(out, r ? r : w);                     // replacement or the original word
+        } else {                                        // space / punctuation: copy as is
+            int l = strlen(out); out[l] = *in; out[l+1] = 0; in++;
+        }
+    }
+}
+
+int main() {
+    int s = socket(AF_INET, SOCK_DGRAM, 0);             // UDP socket
+    struct sockaddr_in addr = {0}, cli;
+    addr.sin_family = AF_INET; addr.sin_addr.s_addr = INADDR_ANY; addr.sin_port = htons(9090);
+    bind(s, (struct sockaddr*)&addr, sizeof addr);      // server must bind so clients know the port
+    char in[1024], out[4096];
+    while (1) {
+        socklen_t len = sizeof cli;                     // value-result argument, reset every time
+        int n = recvfrom(s, in, sizeof in - 1, 0, (struct sockaddr*)&cli, &len); // also fills client address
+        in[n] = 0;
+        translate(in, out);
+        sendto(s, out, strlen(out), 0, (struct sockaddr*)&cli, len); // reply to that client
+    }
+}
