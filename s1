@@ -1,0 +1,30 @@
+#define PORT 8080
+int main() {
+    int sfd = socket(AF_INET, SOCK_STREAM, 0);          // create TCP socket
+    int opt = 1;
+    setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof opt); // allow quick restart
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;                          // IPv4
+    addr.sin_addr.s_addr = INADDR_ANY;                  // listen on all interfaces
+    addr.sin_port = htons(PORT);                        // port in network byte order
+    bind(sfd, (struct sockaddr*)&addr, sizeof addr);    // attach address to socket
+    listen(sfd, 5);                                     // passive mode, backlog 5
+    int cfd = accept(sfd, NULL, NULL);                  // blocks; returns per-client socket
+
+    int n, m[50*50];
+    recv(cfd, &n, sizeof n, MSG_WAITALL);               // MSG_WAITALL: don't return until all bytes arrive
+    recv(cfd, m, n*n*sizeof(int), MSG_WAITALL);         // TCP is a stream, one recv may be partial
+
+    int upper = 1, lower = 1;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            if (i > j && m[i*n+j] != 0) upper = 0;      // non-zero below diagonal -> not upper
+            if (i < j && m[i*n+j] != 0) lower = 0;      // non-zero above diagonal -> not lower
+        }
+    const char *res = (upper && lower) ? "Diagonal matrix" :
+                      upper ? "Upper triangular matrix" :
+                      lower ? "Lower triangular matrix" :
+                              "Not upper triangular, lower triangular or diagonal";
+    send(cfd, res, strlen(res)+1, 0);                   // +1 sends the '\0' too
+    close(cfd); close(sfd);
+}
